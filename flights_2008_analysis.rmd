@@ -1,0 +1,184 @@
+---
+title: "Flight data analysis"
+output: html_document
+date: "February, 2015"
+---
+
+This is my solution to the third exercise of [Leada's](www.teamleada.com) data year problems. This time, it is about US flight data from 2008. However, my results do not match the provided solution to part 3. I would be very much inclined if you could point out my errors.
+
+### Problem description
+
+Problem 1: Find the IATA code that is in the Origin column, but is NOT is the Dest column.
+
+Problem 2:  Which airport, as defined by the IATA code, has at least 10,000 flights and had the lowest probability for a delayed flight in the data?
+
+Define a delay as:
+
+* If ArrDelay > 0, then count as a delayed flight to Origin airport.
+* If DepDelay > 0, then count as a delayed flight to Dest airport.
+* Total delayed flights equals the sum of the two above.
+* Probability of delay equals total delayed flights divided by total flights (Origin & Dest) that go through that airport.
+
+Problem 3: Create a spreadsheet of data which calculates the historical probability of flight delay in each of the twenty carriers based off of two characteristics.
+
+* DayofWeek - Weekday (1,2,3,4,5) or Weekend (6,7)
+* DepTime - Day Time (0501 to 1700), Night Time (1701 to 2400), or Red Eye (0000 to 0500)
+* UniqueCarrier - Carrier (20)
+
+For example, for an AA day time flight on the weekday, the percentage of delayed flights was ~29.3%.
+
+### Data retrieval
+
+```{r include=FALSE}
+require(dplyr)
+require(Amelia)
+setwd("C:/dev/repositories/R/Flights_2008")
+```
+
+I downloaded the file from the mentioned [website](http://stat-computing.org/dataexpo/2009/the-data.html) and extracted it. The exercise description points out, that only the first million rows should be considered:
+
+```{r}
+raw.data <- read.csv("2008.csv", header = TRUE, sep = ",", nrow = 1000000, as.is = FALSE)
+summary(raw.data)
+```
+
+The summary shows that missing values could become a problem. Thus, I use the Amelia package to get an overview of the missing data. It is a neat trick I learned from [this tutorial](https://github.com/wehrley/wehrley.github.io/blob/master/SOUPTONUTS.md) about the Kaggle Titanic challenge. But please be warned: For this many data rows, it will take some time.
+
+```{r}
+missmap(raw.data, main="Flights 2008 data - Missings Map", 
+        col=c("yellow", "black"), legend=FALSE)
+```
+
+This clearly shows that I can't just omit rows with missing values, which could be achieved by the na.omit function.
+
+###Problem 1
+
+The first problem is easily answered. A quick check using the unique function reveals that there one more destination than there are origins. Using a diff function of the dplyr package results in the one IATA code that is missing from the list of origins.
+
+```{r}
+u_dest <- mutate(unique(select(raw.data, Dest)), 
+                 comp = as.character(Dest)) %>% select(comp)
+u_origin <- mutate(unique(select(raw.data, Origin)), 
+                   comp = as.character(Origin)) %>% select(comp)
+
+dplyr::setdiff(u_dest, u_origin)
+```
+
+Concerning the actual solution in R I admit that it may be overly complicated and may be solved using functionality from R's base package. However, I like to stick to a single set of tools and since I use dplyr for most of my stuff I am going to use it here.
+
+###Problem 2
+
+The solution to the second problem is also fairly straight forward. First of all the delay conditions are added, belonging to either origin or destination:
+
+* If ArrDelay > 0 it is counted on origin side
+* If DepDelay > 0 it is counted on destination side
+
+This leads back to a previously identified problem: Missing values. I am going to remove data rows with missing values in either columns and afterwards add variables for the two conditions:
+
+```{r}
+ex2.data <- raw.data %>% 
+  filter(!is.na(ArrDelay), !is.na(DepDelay)) %>%
+  mutate(origin_delay = ArrDelay > 0, dest_delay = DepDelay > 0)
+```
+
+Afterwards, origin and destination data is split and concatenated in order to tread origin destination delays equally.
+
+```{r}
+ex2.originData <- ex2.data %>%
+  select(airport = Origin, delay = origin_delay)
+
+ex2.destData <- ex2.data %>%
+  select(airport = Dest, delay = dest_delay)
+
+ex2.airports <- rbind(ex2.originData, ex2.destData)
+```
+
+As a last step a query is issued. It groups the prepared data by airports (IATA codes) and calculates the percentage of delayed entries by summing the delay column and dividing it by the number of rows per airport. The delay column contains Boolean values and R represents TRUE by 1 and FALSE by 0, making the sum function a viable option. 
+
+```{r}
+ex2.airports %>% 
+  group_by(airport) %>%
+  summarize(sumOfDelays = sum(delay, na.rm=TRUE), flights = n()) %>%
+  filter(flights > 10000) %>%
+  mutate(probOfDelay = sumOfDelays / flights) %>%
+  arrange(probOfDelay)
+```
+
+As a last step the results are filtered for airports with more than 10,000 entries and arranged according to the probability of delay. It results in a probability of 0.26 which sounds like a lot, but if I think about my personal experience with commercial airlines, this sounds about right.
+
+###Problem 3
+
+Solving the third problem should be easy as well. However, my solution differs greatly from the provided value in the problem description. In addition, I did not prepare a spreadsheet.
+
+First of all, the missing values are dealt with, using the same strategy as before. Afterwards, I select relevant variables for the problem, namely DayOfWeek, DepTime, UniqueCarrier, ArrDelay and DepDelay. Now I add the checks for delays and the new dimensions for weekday / weekend differentiation and daytime / nighttime / red eye according to the provided values:
+
+```{r}
+ex3.data <- raw.data %>% 
+  filter(!is.na(ArrDelay), !is.na(DepDelay)) %>%
+  select(DayOfWeek, DepTime, UniqueCarrier, ArrDelay, DepDelay) %>%
+  mutate(delay = ArrDelay > 0 | DepDelay > 0,
+         isWeekday = DayOfWeek %in% 1:5,
+         isWeekend = DayOfWeek %in% 6:7,
+         isDayTime = DepTime %in% 501:1700, 
+         isNightTime = DepTime %in% 1701:2400,
+         isRedEye = DepTime %in% 0:500)
+```
+
+Now I query the given dimensions (an abstract spreadsheet ;)) and detect:
+
+```{r}
+ex3.data %>%
+  filter(isDayTime, isWeekday) %>%
+  group_by(UniqueCarrier) %>%
+  summarize(probOfDelay = mean(delay))
+```
+
+that my result greatly differs from the provided solution. In fact, it seems to be round about (but not exactly) twice as much. The "twice as much" idea came to mind since I combine both delay criteria for the flights. However, I think that this is correct since to my mind, it does not matter if there is an arrival delay or a departure delay - in both cases the flight is delayed. Thus, the error has to be somewhere else but I was not able to find it. 
+
+However, if I change the delay threshold to 15 minutes, I get 0.2926 probability of delay for AA:
+
+```{r}
+ex3.data <- raw.data %>% 
+  filter(!is.na(ArrDelay), !is.na(DepDelay)) %>%
+  select(DayOfWeek, DepTime, UniqueCarrier, ArrDelay, DepDelay) %>%
+  mutate(delay = ArrDelay > 15 | DepDelay > 15,
+         isWeekday = DayOfWeek %in% 1:5,
+         isWeekend = DayOfWeek %in% 6:7,
+         isDayTime = DepTime %in% 501:1700, 
+         isNightTime = DepTime %in% 1701:2400,
+         isRedEye = DepTime %in% 0:500)
+
+ex3.data %>%
+  filter(isDayTime, isWeekday) %>%
+  group_by(UniqueCarrier) %>%
+  summarize(probOfDelay = mean(delay))
+```
+
+Coincidence? Anyhow, I regard 15 minutes as a more appropriate threshold for delay. Since I work in consulting I fly twice a week and 15 minutes delay is kind of what you expect (at least in Germany).
+
+This discovery let me to recalculate my results of problem 2, leading to the following values:
+
+```{r}
+ex2.data <- raw.data %>% 
+  filter(!is.na(ArrDelay), !is.na(DepDelay)) %>%
+  mutate(origin_delay = ArrDelay > 15, dest_delay = DepDelay > 15)
+
+ex2.originData <- ex2.data %>%
+  select(airport = Origin, delay = origin_delay)
+
+ex2.destData <- ex2.data %>%
+  select(airport = Dest, delay = dest_delay)
+
+ex2.airports <- rbind(ex2.originData, ex2.destData)
+
+ex2.airports %>% 
+  group_by(airport) %>%
+  summarize(sumOfDelays = sum(delay), flights = n()) %>%
+  filter(flights > 10000) %>%
+  mutate(probOfDelay = sumOfDelays / flights) %>%
+  arrange(probOfDelay)
+```
+
+### Conclusion
+
+I think I did something wrong but currently I don't know where the mistake is. For suggestions, please send me a tweet @FloStats on twitter. Else I will just wait for the solutions.
