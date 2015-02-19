@@ -16,6 +16,7 @@ $RECYCLE.BIN/
 
 #csv
 *.csv
+.RHistory
 
 # Windows shortcuts
 *.lnk
