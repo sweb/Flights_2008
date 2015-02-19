@@ -56,7 +56,7 @@ if (window.hljs && document.readyState && document.readyState === "complete") {
 </div>
 
 
-<p>This is my solution to the third exercise of <a href="www.teamleada.com">Leada’s</a> data year problems. This time, it is about US flight data from 2008. However, my results do not match the provided solution to part 3. I would be very much inclined if you could point out my errors.</p>
+<p>This is my solution to the third exercise of <a href="www.teamleada.com">Leada’s</a> data year problems. This time, it is about US flight data from 2008. However, my results do not match the provided solution to part 3. I would be very much inclined if you could point out my errors. The source code can be found in my <a href="https://github.com/sweb/Flights_2008">github-repo</a>.</p>
 <div id="problem-description" class="section level3">
 <h3>Problem description</h3>
 <p>Problem 1: Find the IATA code that is in the Origin column, but is NOT is the Dest column.</p>
@@ -162,7 +162,7 @@ u_origin &lt;- mutate(unique(select(raw.data, Origin)),
 dplyr::setdiff(u_dest, u_origin)</code></pre>
 <pre><code>##   comp
 ## 1  OGD</code></pre>
-<p>Concerning the actual solution in R I admit that it may be overly complicated and may be solved using functionality from R’s base package. However, I like to stick to a single set of tools and since I use dplyr for most of my stuff I am going to use it here.</p>
+<p>Concerning the actual solution in R I admit that it may be overly complicated and may be solved using functionality from R’s base package. However, I like to stick to a single set of tools and since I use dplyr for most of my stuff I am going to use it here too.</p>
 </div>
 <div id="problem-2" class="section level3">
 <h3>Problem 2</h3>
@@ -286,7 +286,7 @@ ex3.data %&gt;%
 ## 18            WN  0.20329427
 ## 19            XE  0.25682703
 ## 20            YV  0.26749470</code></pre>
-<p>Coincidence? Anyhow, I regard 15 minutes as a more appropriate threshold for delay. Since I work in consulting I fly twice a week and 15 minutes delay is kind of what you expect (at least in Germany).</p>
+<p>Coincidence? Anyhow, I regard 15 minutes as a more appropriate threshold for delay. Since I work for a consultancy, I fly twice a week and 15 minutes delay is kind of what you expect (at least in Germany).</p>
 <p>This discovery let me to recalculate my results of problem 2, leading to the following values:</p>
 <pre class="r"><code>ex2.data &lt;- raw.data %&gt;% 
   filter(!is.na(ArrDelay), !is.na(DepDelay)) %&gt;%
